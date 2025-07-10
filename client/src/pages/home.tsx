@@ -25,6 +25,13 @@ export default function Home({ userPreferences }: HomeProps) {
     queryFn: contentApi.getAllContent,
   });
 
+  // Search content using API when searchQuery changes
+  const { data: searchResults = [], isLoading: searchLoading } = useQuery({
+    queryKey: ["/api/content/search", searchQuery],
+    queryFn: () => contentApi.searchContent(searchQuery),
+    enabled: searchQuery.length > 0,
+  });
+
   // Generate AI recommendations
   const generateRecommendationsMutation = useMutation({
     mutationFn: contentApi.generateRecommendations,
@@ -42,14 +49,10 @@ export default function Home({ userPreferences }: HomeProps) {
     }
   }, [userPreferences]);
 
-  // Filter content based on category and search
-  const filteredContent = allContent.filter((content: ContentItem) => {
-    const matchesCategory = selectedCategory === "all" || content.category === selectedCategory;
-    const matchesSearch = searchQuery === "" || 
-      content.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      content.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return matchesCategory && matchesSearch;
+  // Use search results when searching, otherwise filter all content by category
+  const baseContent = searchQuery.length > 0 ? searchResults : allContent;
+  const filteredContent = baseContent.filter((content: ContentItem) => {
+    return selectedCategory === "all" || content.category === selectedCategory;
   });
 
   const handleRefreshRecommendations = () => {
@@ -139,20 +142,58 @@ export default function Home({ userPreferences }: HomeProps) {
           {/* All Content Grid */}
           <div className="mt-12">
             <h3 className="text-xl font-bold mb-6">
-              {selectedCategory === "all" ? "All Content" : `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Content`}
+              {searchQuery.length > 0 
+                ? `Search Results` 
+                : selectedCategory === "all" ? "All Content" : `${selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1)} Content`}
             </h3>
+
+            {/* Show search status */}
+            {searchQuery.length > 0 && (
+              <div className="mb-4 text-sm text-gray-400">
+                {searchLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Searching...</span>
+                  </div>
+                ) : (
+                  <span>Found {searchResults.length} results for "{searchQuery}"</span>
+                )}
+              </div>
+            )}
             
-            {contentLoading ? (
+            {contentLoading || (searchQuery.length > 0 && searchLoading) ? (
               <LoadingSkeleton />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredContent.map((content: ContentItem) => (
-                  <ContentCard
-                    key={content.id}
-                    content={content}
-                    onPlay={handlePlay}
-                  />
-                ))}
+                {filteredContent.length > 0 ? (
+                  filteredContent.map((content: ContentItem) => (
+                    <ContentCard
+                      key={content.id}
+                      content={content}
+                      onPlay={handlePlay}
+                    />
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-12">
+                    <div className="text-gray-400 text-lg mb-2">
+                      {searchQuery.length > 0 ? "No search results found" : "No content found"}
+                    </div>
+                    <div className="text-gray-500">
+                      {searchQuery.length > 0 
+                        ? `Try a different search term or clear your search` 
+                        : "Try adjusting your category filter"}
+                    </div>
+                    {searchQuery.length > 0 && (
+                      <Button
+                        variant="outline"
+                        onClick={() => setSearchQuery("")}
+                        className="mt-4"
+                      >
+                        Clear Search
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
