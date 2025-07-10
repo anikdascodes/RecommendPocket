@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Sparkles, RefreshCw, Flame, Plus } from "lucide-react";
+import { Search, Sparkles, RefreshCw, Flame, Plus, ThumbsUp, ThumbsDown, X, TrendingUp, Star, Clock, Target } from "lucide-react";
 import Header from "@/components/header";
 import ContentCard from "@/components/content-card";
 import CategoryFilter from "@/components/category-filter";
@@ -17,15 +17,30 @@ interface HomeProps {
   userPreferences: UserPreferences;
 }
 
+interface EnhancedRecommendation extends Recommendation {
+  confidence: number;
+  recommendationType: string;
+  matchDetails: {
+    genreMatch: number;
+    durationMatch: number;
+    qualityScore: number;
+    similarityScore: number;
+    discoveryScore: number;
+  };
+}
+
 export default function Home({ userPreferences }: HomeProps) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [recommendations, setRecommendations] = useState<EnhancedRecommendation[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false); // Changed from true to false
+  const [isSearchFocused, setIsSearchFocused] = useState(false); // New state to track focus
   const [currentlyPlaying, setCurrentlyPlaying] = useState<ContentItem | null>(null);
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
+  const [dismissedRecommendations, setDismissedRecommendations] = useState<Set<number>>(new Set());
   const { toast } = useToast();
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   
   // Popular search suggestions when no query
   const popularSuggestions = [
@@ -33,6 +48,31 @@ export default function Home({ userPreferences }: HomeProps) {
   ];
 
   const userId = 1; // For demo purposes
+
+  // Handle keyboard events and clicks outside search
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowSuggestions(false);
+        setIsSearchFocused(false);
+      }
+    };
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+        setIsSearchFocused(false);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Fetch all content
   const { data: allContent = [], isLoading: contentLoading } = useQuery({
@@ -59,22 +99,38 @@ export default function Home({ userPreferences }: HomeProps) {
     queryFn: () => contentApi.getListeningHistory(userId),
   });
 
-  // Generate AI recommendations
+  // Generate Enhanced Recommendations
   const generateRecommendationsMutation = useMutation({
     mutationFn: contentApi.generateRecommendations,
     onSuccess: (data) => {
       setRecommendations(data);
       toast({
-        title: "Recommendations Updated",
-        description: `Generated ${data.length} personalized recommendations using AI.`,
+        title: "Smart Recommendations Updated! 🎯",
+        description: `Generated ${data.length} personalized recommendations with advanced matching.`,
       });
     },
     onError: (error) => {
       console.error("Error generating recommendations:", error);
       toast({
         title: "Recommendation Error",
-        description: "Failed to generate AI recommendations. Showing popular content instead.",
+        description: "Failed to generate recommendations. Please try again.",
         variant: "destructive",
+      });
+    },
+  });
+
+  // Recommendation feedback mutation
+  const feedbackMutation = useMutation({
+    mutationFn: ({ contentId, feedback }: { contentId: number; feedback: string }) =>
+      fetch('/api/recommendations/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentId, feedback, userId })
+      }),
+    onSuccess: () => {
+      toast({
+        title: "Thanks for your feedback!",
+        description: "This helps us improve your recommendations.",
       });
     },
   });
@@ -167,6 +223,14 @@ export default function Home({ userPreferences }: HomeProps) {
     }
   };
 
+  const handleRecommendationFeedback = (contentId: number, feedback: string) => {
+    feedbackMutation.mutate({ contentId, feedback });
+    
+    if (feedback === 'not_interested') {
+      setDismissedRecommendations(prev => new Set([...prev, contentId]));
+    }
+  };
+
   // Get progress for content
   const getContentProgress = (contentId: number) => {
     const history = listeningHistory.find((h: any) => h.contentId === contentId);
@@ -177,6 +241,41 @@ export default function Home({ userPreferences }: HomeProps) {
       parseInt(currentlyPlaying.duration.replace(/[^\d]/g, '')) || 60;
     return Math.min((history.progressMinutes / totalMinutes) * 100, 100);
   };
+
+  const getRecommendationTypeIcon = (type: string) => {
+    const icons = {
+      'perfect_match': Target,
+      'based_on_history': TrendingUp,
+      'highly_rated': Star,
+      'discovery': Sparkles
+    };
+    return icons[type as keyof typeof icons] || Sparkles;
+  };
+
+  const getRecommendationTypeColor = (type: string) => {
+    const colors = {
+      'perfect_match': 'text-green-400',
+      'based_on_history': 'text-blue-400',
+      'highly_rated': 'text-yellow-400',
+      'discovery': 'text-purple-400'
+    };
+    return colors[type as keyof typeof colors] || 'text-primary';
+  };
+
+  const getRecommendationTypeLabel = (type: string) => {
+    const labels = {
+      'perfect_match': 'Perfect Match',
+      'based_on_history': 'Based on History',
+      'highly_rated': 'Highly Rated',
+      'discovery': 'Discovery'
+    };
+    return labels[type as keyof typeof labels] || 'Recommended';
+  };
+
+  // Filter out dismissed recommendations
+  const visibleRecommendations = recommendations.filter(
+    rec => !dismissedRecommendations.has(rec.content.id)
+  );
 
   const trendingContent = allContent
     .sort((a: ContentItem, b: ContentItem) => (b.playCount || 0) - (a.playCount || 0))
@@ -189,17 +288,24 @@ export default function Home({ userPreferences }: HomeProps) {
       {/* Search Section */}
       <section className="bg-gray-800 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative max-w-2xl mx-auto">
+          <div ref={searchContainerRef} className="relative max-w-2xl mx-auto">
             <Input
               type="text"
               placeholder="Search for audio content..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
+                // Only show suggestions if the search input is focused
+                if (isSearchFocused) {
+                  setShowSuggestions(true);
+                }
+              }}
+              onFocus={() => {
+                setIsSearchFocused(true);
                 setShowSuggestions(true);
               }}
-              onFocus={() => setShowSuggestions(true)}
               onBlur={() => {
+                setIsSearchFocused(false);
                 // Delay hiding suggestions to allow clicking on them
                 setTimeout(() => setShowSuggestions(false), 150);
               }}
@@ -208,7 +314,7 @@ export default function Home({ userPreferences }: HomeProps) {
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             
             {/* Search Suggestions Dropdown */}
-            {showSuggestions && (
+            {showSuggestions && isSearchFocused && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-gray-700 border border-gray-600 rounded-xl shadow-lg z-50 max-h-96 overflow-y-auto">
                 {searchQuery.length > 0 ? (
                   // Show search results when user is typing
@@ -229,6 +335,7 @@ export default function Home({ userPreferences }: HomeProps) {
                           onClick={() => {
                             setSearchQuery(content.title);
                             setShowSuggestions(false);
+                            setIsSearchFocused(false);
                           }}
                         >
                           <div className="flex items-center space-x-3">
@@ -267,6 +374,7 @@ export default function Home({ userPreferences }: HomeProps) {
                         onClick={() => {
                           setSearchQuery(suggestion);
                           setShowSuggestions(false);
+                          setIsSearchFocused(false);
                         }}
                       >
                         <div className="flex items-center space-x-3">
@@ -289,17 +397,20 @@ export default function Home({ userPreferences }: HomeProps) {
         onCategoryChange={setSelectedCategory}
       />
 
-      {/* AI Recommendations Section */}
+      {/* Enhanced Smart Recommendations Section */}
       <section className="py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-2xl font-bold mb-2 flex items-center">
                 <Sparkles className="text-primary mr-2" />
-                AI Recommendations for You
+                Smart Recommendations
+                <span className="ml-2 bg-gradient-to-r from-primary to-accent text-white text-xs px-2 py-1 rounded-full">
+                  AI-Powered
+                </span>
               </h2>
               <p className="text-gray-400">
-                Based on your preferences for {userPreferences.genres.join(", ")}
+                Personalized for your {userPreferences.genres.join(", ")} preferences
               </p>
             </div>
             <Button
@@ -316,44 +427,153 @@ export default function Home({ userPreferences }: HomeProps) {
             <LoadingSkeleton />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-              {recommendations
+              {visibleRecommendations
                 .filter(rec => rec.content && rec.content.id) // Filter out invalid recommendations
-                .map((rec) => (
-                <div key={rec.content.id} className="relative">
-                  <ContentCard
-                    content={rec.content}
-                    onPlay={handlePlay}
-                    onFavorite={handleFavorite}
-                    isFavorite={favorites.has(rec.content.id)}
-                    progress={getContentProgress(rec.content.id)}
-                  />
-                  {rec.reason && (
-                    <div className="mt-2 p-3 bg-gradient-to-r from-gray-800 to-gray-700 rounded-lg border-l-4 border-primary">
-                      <div className="flex items-start space-x-2">
-                        <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-xs font-medium text-gray-300 mb-1">AI Recommendation</p>
-                          <p className="text-sm text-gray-200">{rec.reason}</p>
-                          {rec.score && (
-                            <div className="mt-2">
-                              <div className="flex items-center space-x-2">
-                                <span className="text-xs text-gray-400">Match Score:</span>
-                                <div className="flex-1 bg-gray-600 rounded-full h-1.5">
-                                  <div 
-                                    className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                                    style={{ width: `${rec.score}%` }}
-                                  ></div>
-                                </div>
-                                <span className="text-xs text-primary font-medium">{rec.score}%</span>
-                              </div>
+                .map((rec) => {
+                  const IconComponent = getRecommendationTypeIcon(rec.recommendationType);
+                  const typeColor = getRecommendationTypeColor(rec.recommendationType);
+                  const typeLabel = getRecommendationTypeLabel(rec.recommendationType);
+                  
+                  return (
+                    <div key={rec.content.id} className="relative group">
+                      <ContentCard
+                        content={rec.content}
+                        onPlay={handlePlay}
+                        onFavorite={handleFavorite}
+                        isFavorite={favorites.has(rec.content.id)}
+                        progress={getContentProgress(rec.content.id)}
+                      />
+                      
+                      {/* Enhanced Recommendation Details */}
+                      <div className="mt-3 p-4 bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg border border-gray-700 shadow-lg">
+                        {/* Recommendation Type and Confidence */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center space-x-2">
+                            <IconComponent className={`w-4 h-4 ${typeColor}`} />
+                            <span className={`text-sm font-medium ${typeColor}`}>
+                              {typeLabel}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-1">
+                            <div className="text-xs text-gray-400">Match:</div>
+                            <div className={`text-sm font-bold ${
+                              rec.confidence >= 80 ? 'text-green-400' : 
+                              rec.confidence >= 60 ? 'text-yellow-400' : 'text-gray-400'
+                            }`}>
+                              {Math.round(rec.confidence)}%
                             </div>
-                          )}
+                          </div>
+                        </div>
+
+                        {/* Reason */}
+                        <div className="mb-3">
+                          <p className="text-sm text-gray-200 leading-relaxed">
+                            {rec.reason}
+                          </p>
+                        </div>
+
+                        {/* Match Breakdown */}
+                        <div className="space-y-2 mb-4">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-400">Genre Match</span>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-16 bg-gray-600 rounded-full h-1">
+                                <div 
+                                  className="bg-green-400 h-1 rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.min(100, rec.matchDetails?.genreMatch || 0)}%` }}
+                                />
+                              </div>
+                              <span className="text-gray-300 w-8">{Math.round(rec.matchDetails?.genreMatch || 0)}%</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-400">Duration Fit</span>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-16 bg-gray-600 rounded-full h-1">
+                                <div 
+                                  className="bg-blue-400 h-1 rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.min(100, rec.matchDetails?.durationMatch || 0)}%` }}
+                                />
+                              </div>
+                              <span className="text-gray-300 w-8">{Math.round(rec.matchDetails?.durationMatch || 0)}%</span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-400">Quality Score</span>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-16 bg-gray-600 rounded-full h-1">
+                                <div 
+                                  className="bg-yellow-400 h-1 rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.min(100, rec.matchDetails?.qualityScore || 0)}%` }}
+                                />
+                              </div>
+                              <span className="text-gray-300 w-8">{Math.round(rec.matchDetails?.qualityScore || 0)}%</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* User Feedback Buttons */}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-700">
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleRecommendationFeedback(rec.content.id, 'like')}
+                              className="text-gray-400 hover:text-green-400 hover:bg-green-400/10 p-1"
+                              title="Good recommendation"
+                            >
+                              <ThumbsUp className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleRecommendationFeedback(rec.content.id, 'dislike')}
+                              className="text-gray-400 hover:text-red-400 hover:bg-red-400/10 p-1"
+                              title="Not interested"
+                            >
+                              <ThumbsDown className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleRecommendationFeedback(rec.content.id, 'not_interested')}
+                              className="text-gray-400 hover:text-gray-300 hover:bg-gray-600/50 p-1"
+                              title="Remove this recommendation"
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                          
+                          <div className="text-xs text-gray-500">
+                            {Math.round(rec.score)}/100
+                          </div>
                         </div>
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                  );
+                })}
+            </div>
+          )}
+
+          {/* Show message if no recommendations */}
+          {!generateRecommendationsMutation.isPending && visibleRecommendations.length === 0 && (
+            <div className="text-center py-12">
+              <Sparkles className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-400 mb-2">
+                Ready to discover amazing content?
+              </h3>
+              <p className="text-gray-500 mb-6">
+                Click refresh to get personalized recommendations based on your preferences
+              </p>
+              <Button
+                onClick={handleRefreshRecommendations}
+                className="bg-primary text-white hover:bg-primary/90"
+              >
+                <Sparkles className="mr-2 w-4 h-4" />
+                Generate Recommendations
+              </Button>
             </div>
           )}
 

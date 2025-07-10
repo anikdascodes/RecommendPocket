@@ -1,4 +1,4 @@
-import { apiRequest } from "./queryClient";
+import { getQueryFn } from "./queryClient";
 
 export interface GenerateRecommendationsRequest {
   preferences: {
@@ -7,42 +7,111 @@ export interface GenerateRecommendationsRequest {
   };
 }
 
+export interface RecommendationFeedbackRequest {
+  contentId: number;
+  feedback: 'like' | 'dislike' | 'not_interested';
+  userId: number;
+}
+
 export const contentApi = {
-  getAllContent: () => fetch("/api/content").then(res => res.json()),
+  // Content endpoints
+  getAllContent: getQueryFn<any[]>({ on401: "throw" }),
+  searchContent: async (query: string) => {
+    const response = await fetch(`/api/content/search?q=${encodeURIComponent(query)}`);
+    if (!response.ok) throw new Error('Search failed');
+    return response.json();
+  },
   
-  getContentByCategory: (category: string) => 
-    fetch(`/api/content/category/${category}`).then(res => res.json()),
+  // Enhanced recommendation endpoints
+  generateRecommendations: async (request: GenerateRecommendationsRequest) => {
+    const response = await fetch('/api/recommendations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+    if (!response.ok) throw new Error('Failed to generate recommendations');
+    return response.json();
+  },
   
-  searchContent: (query: string) => 
-    fetch(`/api/content/search?q=${encodeURIComponent(query)}`).then(res => res.json()),
+  submitRecommendationFeedback: async (request: RecommendationFeedbackRequest) => {
+    const response = await fetch('/api/recommendations/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+    if (!response.ok) throw new Error('Failed to submit feedback');
+    return response.json();
+  },
   
-  savePreferences: (preferences: any) => 
-    apiRequest("POST", "/api/preferences", preferences).then(res => res.json()),
+  // User preferences
+  savePreferences: async (preferences: any) => {
+    const response = await fetch('/api/preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(preferences)
+    });
+    if (!response.ok) throw new Error('Failed to save preferences');
+    return response.json();
+  },
   
-  generateRecommendations: (data: GenerateRecommendationsRequest) => 
-    apiRequest("POST", "/api/recommendations", data).then(res => res.json()),
-
-  // Favorites API
-  getUserFavorites: (userId: number) => 
-    fetch(`/api/favorites/${userId}`).then(res => res.json()),
+  // Favorites
+  getUserFavorites: async (userId: number) => {
+    const response = await fetch(`/api/favorites/${userId}`);
+    if (!response.ok) throw new Error('Failed to fetch favorites');
+    return response.json();
+  },
   
-  addToFavorites: (userId: number, contentId: number) => 
-    apiRequest("POST", "/api/favorites", { userId, contentId }).then(res => res.json()),
+  addToFavorites: async (userId: number, contentId: number) => {
+    const response = await fetch('/api/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, contentId })
+    });
+    if (!response.ok) throw new Error('Failed to add to favorites');
+    return response.json();
+  },
   
-  removeFromFavorites: (userId: number, contentId: number) => 
-    apiRequest("DELETE", "/api/favorites", { userId, contentId }).then(res => res.json()),
-
-  // Progress API
-  updateProgress: (userId: number, contentId: number, progressMinutes: number, completed: boolean) => 
-    apiRequest("POST", "/api/progress", { userId, contentId, progressMinutes, completed }).then(res => res.json()),
+  removeFromFavorites: async (userId: number, contentId: number) => {
+    const response = await fetch('/api/favorites', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, contentId })
+    });
+    if (!response.ok) throw new Error('Failed to remove from favorites');
+    return response.json();
+  },
   
-  getListeningHistory: (userId: number) => 
-    fetch(`/api/history/${userId}`).then(res => res.json()),
-
-  // Rating API
-  rateContent: (userId: number, contentId: number, rating: number, review?: string) => 
-    apiRequest("POST", "/api/rate", { userId, contentId, rating, review }).then(res => res.json()),
+  // Listening history
+  getListeningHistory: async (userId: number) => {
+    const response = await fetch(`/api/history/${userId}`);
+    if (!response.ok) throw new Error('Failed to fetch history');
+    return response.json();
+  },
   
-  getContentRating: (contentId: number) => 
-    fetch(`/api/content/${contentId}/rating`).then(res => res.json()),
+  updateProgress: async (userId: number, contentId: number, progressMinutes: number, completed: boolean) => {
+    const response = await fetch('/api/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, contentId, progressMinutes, completed })
+    });
+    if (!response.ok) throw new Error('Failed to update progress');
+    return response.json();
+  },
+  
+  // Ratings
+  getUserRatings: async (userId: number) => {
+    const response = await fetch(`/api/ratings/${userId}`);
+    if (!response.ok) throw new Error('Failed to fetch ratings');
+    return response.json();
+  },
+  
+  rateContent: async (userId: number, contentId: number, rating: number, review?: string) => {
+    const response = await fetch('/api/rate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, contentId, rating, review })
+    });
+    if (!response.ok) throw new Error('Failed to rate content');
+    return response.json();
+  }
 };

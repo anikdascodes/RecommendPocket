@@ -135,7 +135,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           <div className="animate-fade-in">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-bold mb-4">How long do you usually listen?</h2>
-              <p className="text-gray-400">This helps our AI recommend the perfect content length for your sessions</p>
+              <p className="text-gray-400">This helps us recommend the perfect content length for your sessions</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -173,11 +173,11 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
                 {savePreferencesMutation.isPending ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Generating AI Recommendations...
+                    Generating Recommendations...
                   </>
                 ) : (
                   <>
-                    Generate My AI Recommendations
+                    Generate My Recommendations
                     <Sparkles className="ml-2 w-4 h-4" />
                   </>
                 )}

@@ -7,8 +7,7 @@
 ## 📋 Prerequisites
 
 1. **Vercel Account**: Sign up at [vercel.com](https://vercel.com)
-2. **OpenRouter API Key**: Get your free key from [openrouter.ai](https://openrouter.ai)
-3. **GitHub Repository**: Push your code to GitHub
+2. **GitHub Repository**: Push your code to GitHub
 
 ## 🔧 Step-by-Step Deployment
 
@@ -37,11 +36,10 @@
 In the Vercel project settings, add these environment variables:
 
 ```bash
-OPENROUTER_API_KEY=your_new_openrouter_api_key_here
 NODE_ENV=production
 ```
 
-⚠️ **IMPORTANT**: Never commit API keys to your repository! Always use environment variables.
+No API keys needed! The recommendation system works entirely locally.
 
 **How to add environment variables:**
 1. Go to your project dashboard on Vercel
@@ -70,7 +68,7 @@ RecommendPocket/
 
 ## 🔥 Features Deployed
 
-✅ **AI Recommendations** - Powered by OpenRouter + Google Gemma  
+✅ **Smart Recommendations** - Local algorithm analyzes your preferences  
 ✅ **Real-time Search** - Instant content discovery  
 ✅ **Audio Player** - Full playback controls  
 ✅ **Favorites System** - Save preferred content  
@@ -85,22 +83,23 @@ The app uses these optimized settings for Vercel:
 - **Backend**: Serverless Functions (Node.js)
 - **API Routes**: `/api/*` → Serverless
 - **Assets**: Optimized bundles with code splitting
+- **Recommendations**: Smart local algorithm (no external APIs needed)
 
 ## 🚨 Troubleshooting
 
 ### Build Fails?
 1. Check that all dependencies are in `package.json`
-2. Verify environment variables are set correctly
-3. Ensure API key is valid
+2. Verify build commands in `vercel.json`
+3. Check for any missing imports
 
-### API Not Working?
+### Recommendations Not Working?
 1. Check serverless function logs in Vercel dashboard
-2. Verify environment variables in production
-3. Test API endpoints manually
+2. Verify the local algorithm is working correctly
+3. Test recommendation endpoint manually
 
 ### Slow Performance?
 1. Vercel automatically optimizes static assets
-2. API calls are cached when possible
+2. Recommendations are generated locally (fast)
 3. Use Vercel Analytics to monitor performance
 
 ## 🔗 Useful Commands
@@ -126,13 +125,27 @@ npx vercel logs
 - **Serverless Functions**: Auto-scaling API
 - **CDN**: Global content delivery
 - **HTTPS**: Automatic SSL certificates
+- **Local Recommendations**: No external API delays
 
 ## 📞 Support
 
 If you encounter issues:
 
 1. **Check Vercel Logs**: Dashboard → Functions → View Logs
-2. **Verify Environment**: Settings → Environment Variables
-3. **Test Locally**: Run `npm run build && npm run start`
+2. **Test Locally**: Run `npm run build && npm run start`
+3. **Check Build Process**: Verify all files are included in build
 
-Your AudioVibe app will be live at: `https://your-app-name.vercel.app` 🎵 
+Your AudioVibe app will be live at: `https://your-app-name.vercel.app` 🎵
+
+## 🧠 Smart Recommendation System
+
+The app includes a sophisticated local recommendation algorithm that:
+
+- **Analyzes Genre Preferences**: Matches content to your favorite categories
+- **Considers Duration**: Recommends content that fits your listening habits  
+- **Factors Popularity**: Includes highly-rated and trending content
+- **Learns from Behavior**: Uses your favorites and listening history
+- **Ensures Diversity**: Suggests new content to discover
+- **Works Offline**: No external API dependencies needed
+
+All recommendations are generated instantly on the server without requiring any external services! 
