@@ -1,0 +1,141 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(20, 14.3%, 4.1%);
+  --muted: hsl(60, 4.8%, 95.9%);
+  --muted-foreground: hsl(25, 5.3%, 44.7%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(20, 14.3%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(20, 14.3%, 4.1%);
+  --border: hsl(20, 5.9%, 90%);
+  --input: hsl(20, 5.9%, 90%);
+  --primary: hsl(262, 83%, 58%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(60, 4.8%, 95.9%);
+  --secondary-foreground: hsl(24, 9.8%, 10%);
+  --accent: hsl(24, 95%, 53%);
+  --accent-foreground: hsl(210, 40%, 98%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(60, 9.1%, 97.8%);
+  --ring: hsl(20, 14.3%, 4.1%);
+  --radius: 0.5rem;
+  
+  /* Dark theme colors */
+  --dark-100: hsl(220, 13%, 22%);
+  --dark-200: hsl(224, 15%, 17%);
+  --dark-300: hsl(225, 25%, 11%);
+  --dark-400: hsl(225, 25%, 9%);
+  --dark-500: hsl(224, 71%, 4%);
+  --dark-600: hsl(0, 0%, 6%);
+}
+
+.dark {
+  --background: hsl(224, 71%, 4%);
+  --foreground: hsl(0, 0%, 98%);
+  --muted: hsl(220, 13%, 22%);
+  --muted-foreground: hsl(240, 5%, 64.9%);
+  --popover: hsl(224, 71%, 4%);
+  --popover-foreground: hsl(0, 0%, 98%);
+  --card: hsl(224, 15%, 17%);
+  --card-foreground: hsl(0, 0%, 98%);
+  --border: hsl(220, 13%, 22%);
+  --input: hsl(220, 13%, 22%);
+  --primary: hsl(262, 83%, 58%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(220, 13%, 22%);
+  --secondary-foreground: hsl(0, 0%, 98%);
+  --accent: hsl(24, 95%, 53%);
+  --accent-foreground: hsl(210, 40%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(240, 4.9%, 83.9%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased text-white dark;
+    background-color: var(--dark-500);
+  }
+}
+
+@layer components {
+  .gradient-bg {
+    background: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(24, 95%, 53%) 100%);
+  }
+  
+  .glass-effect {
+    backdrop-filter: blur(10px);
+    background: rgba(30, 30, 30, 0.8);
+  }
+  
+  .content-card {
+    transition: all 0.3s ease;
+  }
+  
+  .content-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04);
+  }
+  
+  .category-card {
+    transition: all 0.3s ease;
+  }
+  
+  .category-card.selected {
+    @apply ring-2 ring-primary;
+    background-color: rgba(139, 92, 246, 0.2);
+  }
+  
+  .duration-card {
+    transition: all 0.3s ease;
+  }
+  
+  .duration-card.selected {
+    @apply ring-2 ring-primary;
+    background-color: rgba(139, 92, 246, 0.2);
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(10px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes slideUp {
+  from { 
+    transform: translateY(20px); 
+    opacity: 0; 
+  }
+  to { 
+    transform: translateY(0); 
+    opacity: 1; 
+  }
+}
