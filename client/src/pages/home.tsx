@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { Search, Sparkles, RefreshCw, Flame, Plus } from "lucide-react";
 import Header from "@/components/header";
 import ContentCard from "@/components/content-card";
@@ -24,6 +25,7 @@ export default function Home({ userPreferences }: HomeProps) {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<ContentItem | null>(null);
   const [isPlayerOpen, setIsPlayerOpen] = useState(false);
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
+  const { toast } = useToast();
   
   // Popular search suggestions when no query
   const popularSuggestions = [
@@ -62,6 +64,18 @@ export default function Home({ userPreferences }: HomeProps) {
     mutationFn: contentApi.generateRecommendations,
     onSuccess: (data) => {
       setRecommendations(data);
+      toast({
+        title: "Recommendations Updated",
+        description: `Generated ${data.length} personalized recommendations using AI.`,
+      });
+    },
+    onError: (error) => {
+      console.error("Error generating recommendations:", error);
+      toast({
+        title: "Recommendation Error",
+        description: "Failed to generate AI recommendations. Showing popular content instead.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -302,15 +316,40 @@ export default function Home({ userPreferences }: HomeProps) {
             <LoadingSkeleton />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-              {recommendations.map((rec) => (
+              {recommendations
+                .filter(rec => rec.content && rec.content.id) // Filter out invalid recommendations
+                .map((rec) => (
                 <div key={rec.content.id} className="relative">
                   <ContentCard
                     content={rec.content}
                     onPlay={handlePlay}
+                    onFavorite={handleFavorite}
+                    isFavorite={favorites.has(rec.content.id)}
+                    progress={getContentProgress(rec.content.id)}
                   />
                   {rec.reason && (
-                    <div className="mt-2 p-2 bg-gray-800 rounded-lg">
-                      <p className="text-xs text-gray-400">{rec.reason}</p>
+                    <div className="mt-2 p-3 bg-gradient-to-r from-gray-800 to-gray-700 rounded-lg border-l-4 border-primary">
+                      <div className="flex items-start space-x-2">
+                        <Sparkles className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs font-medium text-gray-300 mb-1">AI Recommendation</p>
+                          <p className="text-sm text-gray-200">{rec.reason}</p>
+                          {rec.score && (
+                            <div className="mt-2">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs text-gray-400">Match Score:</span>
+                                <div className="flex-1 bg-gray-600 rounded-full h-1.5">
+                                  <div 
+                                    className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                                    style={{ width: `${rec.score}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-xs text-primary font-medium">{rec.score}%</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -1,9 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import fetch from "node-fetch";
 import { storage } from "./storage";
 import { insertUserPreferencesSchema } from "@shared/schema";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express): Promise<Server | Express> {
   // Get all audio content
   app.get("/api/content", async (req, res) => {
     try {
@@ -145,13 +146,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // For serverless environments, return the app directly
+  if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    return app;
+  }
+  
+  // For development, create and return HTTP server
   const httpServer = createServer(app);
   return httpServer;
 }
 
 async function generateAIRecommendations(preferences: any, allContent: any[]) {
-  const OPENROUTER_API_KEY = "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";
-  const MODEL_NAME = "google/gemma-2-9b-it:free";
+  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "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";
+  const MODEL_NAME = "google/gemma-3n-e2b-it:free";
 
   // Create a more detailed prompt with specific instructions
   const userGenres = preferences.genres.join(", ");
@@ -240,14 +247,18 @@ Return only the JSON array, no other text or formatting.`;
         throw new Error("Response is not an array");
       }
       
-      // Ensure all recommendations have required fields
-      recommendations = recommendations.filter(rec => 
-        rec.contentId && rec.reason && rec.score
-      ).slice(0, 6);
+      // Ensure all recommendations have required fields and valid contentIds
+      recommendations = recommendations.filter(rec => {
+        const hasValidFields = rec.contentId && rec.reason && rec.score;
+        const contentExists = allContent.some(c => c.id === rec.contentId);
+        return hasValidFields && contentExists;
+      }).slice(0, 6);
       
       if (recommendations.length === 0) {
         throw new Error("No valid recommendations found");
       }
+      
+      console.log(`Successfully parsed ${recommendations.length} valid recommendations from AI`);
       
     } catch (parseError) {
       console.error("Failed to parse AI response:", parseError);
@@ -273,26 +284,36 @@ Return only the JSON array, no other text or formatting.`;
     }
 
     // Enrich recommendations with full content data
-    const enrichedRecommendations = recommendations.map((rec: any) => {
-      const content = allContent.find(c => c.id === rec.contentId);
-      return {
-        ...rec,
-        content
-      };
-    });
+    const enrichedRecommendations = recommendations
+      .map((rec: any) => {
+        const content = allContent.find(c => c.id === rec.contentId);
+        return {
+          ...rec,
+          content
+        };
+      })
+      .filter(rec => rec.content); // Only return recommendations where content was found
 
     return enrichedRecommendations;
   } catch (error) {
     console.error("Error calling OpenRouter API:", error);
     
     // Fallback: return content based on user preferences
-    const fallbackRecommendations = allContent
-      .filter(content => preferences.genres.includes(content.category))
+    const genreMatchedContent = allContent.filter(content => 
+      preferences.genres.includes(content.category)
+    );
+    
+    // If no genre matches found, use all content
+    const fallbackContent = genreMatchedContent.length > 0 ? genreMatchedContent : allContent;
+    
+    const fallbackRecommendations = fallbackContent
       .slice(0, 6)
-      .map(content => ({
+      .map((content, index) => ({
         contentId: content.id,
-        reason: `Recommended because you selected ${content.category} as a preferred genre`,
-        score: 85,
+        reason: genreMatchedContent.length > 0 
+          ? `Perfect match for your ${content.category} preference`
+          : `Popular ${content.category} content`,
+        score: genreMatchedContent.length > 0 ? 90 - (index * 5) : 75 - (index * 3),
         content
       }));
 
