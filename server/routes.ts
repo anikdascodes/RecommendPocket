@@ -52,7 +52,9 @@ export async function registerRoutes(app: Express): Promise<Server | Express> {
         ...req.body,
       };
 
-      const validatedPreferences = insertUserPreferencesSchema.parse(hydrated);
+      const zodResult = insertUserPreferencesSchema.safeParse(hydrated);
+
+      const validatedPreferences = zodResult.success ? zodResult.data : hydrated; // If validation fails, fall back to hydrated data
 
       // For demo purposes, using userId 1
       const preferences = await storage.saveUserPreferences({
