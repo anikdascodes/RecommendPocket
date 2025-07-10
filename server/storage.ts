@@ -56,8 +56,10 @@ export class MemStorage implements IStorage {
   private currentFavoritesId: number;
   private currentHistoryId: number;
   private currentRatingId: number;
+  private initialized: boolean = false;
 
   constructor() {
+    console.log('[MemStorage] Initializing storage...');
     this.users = new Map();
     this.userPreferences = new Map();
     this.audioContent = new Map();
@@ -78,6 +80,12 @@ export class MemStorage implements IStorage {
   }
 
   private initializeSampleContent() {
+    if (this.initialized) {
+      console.log('[MemStorage] Already initialized, skipping...');
+      return;
+    }
+    
+    console.log('[MemStorage] Initializing sample content...');
     const sampleContent: InsertAudioContent[] = [
       {
         title: "The CEO's Secret Love",
@@ -186,6 +194,9 @@ export class MemStorage implements IStorage {
     sampleContent.forEach(content => {
       this.createAudioContent(content);
     });
+    this.initialized = true;
+    console.log(`[MemStorage] Initialized ${sampleContent.length} sample content items`);
+    console.log(`[MemStorage] Total content count: ${this.audioContent.size}`);
   }
 
   async getUser(id: number): Promise<User | undefined> {
@@ -439,4 +450,19 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Create a global singleton instance for serverless environments
+let globalStorage: MemStorage | undefined;
+
+if (typeof global !== 'undefined') {
+  // In serverless/Node environments, use global to persist across invocations
+  const g = global as any;
+  if (!g.__memStorage) {
+    console.log('[Storage] Creating new global storage instance');
+    g.__memStorage = new MemStorage();
+  } else {
+    console.log('[Storage] Using existing global storage instance');
+  }
+  globalStorage = g.__memStorage;
+}
+
+export const storage = globalStorage || new MemStorage();

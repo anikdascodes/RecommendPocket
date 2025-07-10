@@ -4,6 +4,28 @@ import { storage } from "./storage";
 import { insertUserPreferencesSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server | Express> {
+  // Test endpoint to verify API is working
+  app.get("/api/health", async (req, res) => {
+    console.log('[/api/health] Health check requested');
+    try {
+      const contentCount = await storage.getAllAudioContent();
+      res.json({ 
+        status: "ok", 
+        message: "API is working",
+        contentCount: contentCount.length,
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'unknown'
+      });
+    } catch (error) {
+      console.error('[/api/health] Health check failed:', error);
+      res.status(500).json({ 
+        status: "error", 
+        message: "Storage not initialized",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
   // Get all audio content
   app.get("/api/content", async (req, res) => {
     try {
@@ -41,7 +63,14 @@ export async function registerRoutes(app: Express): Promise<Server | Express> {
 
   // Save user preferences
   app.post("/api/preferences", async (req, res) => {
+    console.log('[/api/preferences] Request received');
+    console.log('[/api/preferences] Body:', JSON.stringify(req.body));
+    
     try {
+      // Log the raw request body
+      console.log('[/api/preferences] Raw body type:', typeof req.body);
+      console.log('[/api/preferences] Raw body keys:', req.body ? Object.keys(req.body) : 'null');
+      
       // Supply defaults for optional columns that may be missing from the client payload
       const hydrated = {
         autoPlay: true,
@@ -52,25 +81,43 @@ export async function registerRoutes(app: Express): Promise<Server | Express> {
         ...req.body,
       };
 
-      const zodResult = insertUserPreferencesSchema.safeParse(hydrated);
+      console.log('[/api/preferences] Hydrated data:', JSON.stringify(hydrated));
 
-      const validatedPreferences = zodResult.success ? zodResult.data : hydrated; // If validation fails, fall back to hydrated data
+      const zodResult = insertUserPreferencesSchema.safeParse(hydrated);
+      
+      if (!zodResult.success) {
+        console.error('[/api/preferences] Zod validation failed:', zodResult.error);
+      }
+
+      const validatedPreferences = zodResult.success ? zodResult.data : hydrated;
+      console.log('[/api/preferences] Validated preferences:', JSON.stringify(validatedPreferences));
 
       // For demo purposes, using userId 1
       const preferences = await storage.saveUserPreferences({
         ...validatedPreferences,
         userId: 1,
       });
+      
+      console.log('[/api/preferences] Saved preferences:', JSON.stringify(preferences));
       res.json(preferences);
     } catch (error) {
-      console.error("Failed to save preferences:", error);
+      console.error("[/api/preferences] Failed to save preferences:", error);
+      console.error("[/api/preferences] Error stack:", error instanceof Error ? error.stack : 'No stack');
 
       // If validation error provide 400 so client can react appropriately
       if ((error as any)?.issues) {
-        return res.status(400).json({ error: "Invalid preferences", details: error });
+        return res.status(400).json({ 
+          error: "Invalid preferences", 
+          details: error,
+          body: req.body
+        });
       }
 
-      res.status(500).json({ error: "Failed to save preferences" });
+      res.status(500).json({ 
+        error: "Failed to save preferences",
+        message: error instanceof Error ? error.message : 'Unknown error',
+        body: req.body
+      });
     }
   });
 

@@ -4,8 +4,6 @@ import { registerRoutes } from '../server/routes';
 
 // Create and configure Express app for serverless
 const app = express();
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // CORS middleware for Vercel
 app.use((req, res, next) => {
@@ -35,8 +33,18 @@ async function initializeRoutes() {
 // Export handler for Vercel
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    console.log(`[Vercel] ${req.method} ${req.url}`);
+    console.log('[Vercel] Headers:', JSON.stringify(req.headers));
+    console.log('[Vercel] Body type:', typeof req.body);
+    console.log('[Vercel] Body:', JSON.stringify(req.body));
+    
     // Initialize routes if not already done
     await initializeRoutes();
+    
+    // Ensure req has body property for Express
+    if (!('body' in req)) {
+      (req as any).body = {};
+    }
     
     // Handle the request with Express
     return new Promise((resolve, reject) => {
@@ -52,9 +60,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (error) {
     console.error('Serverless function error:', error);
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
     res.status(500).json({ 
       error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' ? (error as Error).stack : undefined
     });
   }
 } 
