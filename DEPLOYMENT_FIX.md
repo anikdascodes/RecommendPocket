@@ -6,6 +6,7 @@
 2. **CORS Configuration**: Added proper CORS headers for cross-origin requests
 3. **Error Handling**: Enhanced error handling and logging for production debugging
 4. **Route Initialization**: Fixed route initialization for serverless functions
+5. **Node.js Version Compatibility**: Fixed Node.js version compatibility issues
 
 ## Deploy the Fixes
 
@@ -13,7 +14,7 @@
 If your Vercel project is connected to Git:
 ```bash
 git add .
-git commit -m "Fix: Vercel serverless function configuration"
+git commit -m "Fix: Vercel Node.js version and serverless function configuration"
 git push origin main
 ```
 Vercel will automatically detect and deploy the changes.
@@ -29,6 +30,14 @@ npx vercel --prod
 1. Go to your Vercel dashboard
 2. Find your project
 3. Click "Redeploy" on the latest deployment
+
+## Node.js Version Fix
+
+The deployment was failing due to Node.js version incompatibility. Fixed by:
+
+1. **Added `.nvmrc` file**: Specifies Node.js 18 for Vercel
+2. **Updated `package.json`**: Added engines field with Node.js 18.x
+3. **Simplified `vercel.json`**: Removed specific runtime version to let Vercel auto-detect
 
 ## Verify the Fix
 
@@ -61,6 +70,9 @@ If you still have issues:
 
 ## Common Issues & Solutions
 
+### Issue: "Found invalid Node.js Version" error
+**Solution**: ✅ Fixed with Node.js 18 specification in `.nvmrc` and `package.json`
+
 ### Issue: "Function not found" error
 **Solution**: Ensure the `api/` folder is in your project root and contains `index.ts`
 
@@ -68,7 +80,7 @@ If you still have issues:
 **Solution**: The fix includes CORS headers - redeploy to apply them
 
 ### Issue: Timeout errors
-**Solution**: The function timeout is set to 30 seconds in `vercel.json`
+**Solution**: The function timeout is managed automatically by Vercel
 
 ### Issue: Memory errors
 **Solution**: The payload limit is increased to 10MB in the fixed code
