@@ -42,7 +42,18 @@ export async function registerRoutes(app: Express): Promise<Server | Express> {
   // Save user preferences
   app.post("/api/preferences", async (req, res) => {
     try {
-      const validatedPreferences = insertUserPreferencesSchema.parse(req.body);
+      // Supply defaults for optional columns that may be missing from the client payload
+      const hydrated = {
+        autoPlay: true,
+        downloadQuality: "high",
+        playbackSpeed: 1.0,
+        preferredNarrators: [],
+        preferredLanguages: ["English"],
+        ...req.body,
+      };
+
+      const validatedPreferences = insertUserPreferencesSchema.parse(hydrated);
+
       // For demo purposes, using userId 1
       const preferences = await storage.saveUserPreferences({
         ...validatedPreferences,
@@ -50,6 +61,13 @@ export async function registerRoutes(app: Express): Promise<Server | Express> {
       });
       res.json(preferences);
     } catch (error) {
+      console.error("Failed to save preferences:", error);
+
+      // If validation error provide 400 so client can react appropriately
+      if ((error as any)?.issues) {
+        return res.status(400).json({ error: "Invalid preferences", details: error });
+      }
+
       res.status(500).json({ error: "Failed to save preferences" });
     }
   });
