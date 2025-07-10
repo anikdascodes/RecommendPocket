@@ -218,7 +218,12 @@ export class MemStorage implements IStorage {
       userId: preferences.userId,
       genres: preferences.genres as string[],
       duration: preferences.duration,
-      completedOnboarding: preferences.completedOnboarding || false
+      completedOnboarding: preferences.completedOnboarding || false,
+      preferredNarrators: preferences.preferredNarrators ?? [],
+      preferredLanguages: preferences.preferredLanguages ?? ["English"],
+      autoPlay: preferences.autoPlay ?? true,
+      downloadQuality: preferences.downloadQuality ?? "high",
+      playbackSpeed: preferences.playbackSpeed ?? 1.0,
     };
     this.userPreferences.set(id, userPref);
     return userPref;
@@ -236,7 +241,18 @@ export class MemStorage implements IStorage {
 
   async createAudioContent(content: InsertAudioContent): Promise<AudioContent> {
     const id = this.currentContentId++;
-    const audioContent: AudioContent = { ...content, id, playCount: 0 };
+    const audioContent: AudioContent = {
+      ...content,
+      id,
+      playCount: content.playCount ?? 0,
+      tags: content.tags ?? null,
+      language: content.language ?? null,
+      narrator: content.narrator ?? null,
+      audioUrl: content.audioUrl ?? null,
+      fileSize: content.fileSize ?? null,
+      releaseDate: content.releaseDate ?? new Date(),
+      totalDurationMinutes: content.totalDurationMinutes ?? null,
+    };
     this.audioContent.set(id, audioContent);
     return audioContent;
   }

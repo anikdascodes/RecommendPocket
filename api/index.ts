@@ -40,7 +40,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     
     // Handle the request with Express
     return new Promise((resolve, reject) => {
-      app(req, res, (err: any) => {
+      // Cast to `any` to satisfy TypeScript – runtime behaviour is unchanged
+      (app as any)(req, res, (err: any) => {
         if (err) {
           console.error('Express error:', err);
           reject(err);
