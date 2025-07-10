@@ -56,13 +56,24 @@ export const contentApi = {
   
   // User preferences
   savePreferences: async (preferences: any) => {
+    console.log('[API] Saving preferences:', preferences);
     const response = await fetch('/api/preferences', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(preferences)
     });
-    if (!response.ok) throw new Error('Failed to save preferences');
-    return response.json();
+    
+    console.log('[API] Save preferences response:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[API] Save preferences failed:', errorText);
+      throw new Error(`Failed to save preferences: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('[API] Save preferences success:', data);
+    return data;
   },
   
   // Favorites

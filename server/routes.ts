@@ -4,6 +4,33 @@ import { storage } from "./storage";
 import { insertUserPreferencesSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server | Express> {
+  // Add body parsing middleware for serverless environment
+  app.use((req, res, next) => {
+    // Ensure body exists
+    if (req.body === undefined) {
+      req.body = {};
+    }
+    next();
+  });
+
+  // Root API endpoint
+  app.get("/api", async (req, res) => {
+    res.json({ 
+      message: "AudioVibe API is running",
+      version: "1.0.0",
+      endpoints: [
+        "GET /api/health",
+        "GET /api/content",
+        "GET /api/content/search",
+        "POST /api/preferences",
+        "POST /api/recommendations",
+        "GET /api/favorites/:userId",
+        "POST /api/favorites",
+        "DELETE /api/favorites"
+      ]
+    });
+  });
+
   // Test endpoint to verify API is working
   app.get("/api/health", async (req, res) => {
     console.log('[/api/health] Health check requested');

@@ -5,6 +5,27 @@ import { registerRoutes } from '../server/routes';
 // Create and configure Express app for serverless
 const app = express();
 
+// Custom middleware to ensure body is properly parsed
+app.use((req, res, next) => {
+  // Vercel automatically parses JSON bodies, so we need to handle this properly
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    // If body is a string, try to parse it
+    if (typeof req.body === 'string') {
+      try {
+        req.body = JSON.parse(req.body);
+      } catch (e) {
+        console.error('[Vercel] Failed to parse body as JSON:', e);
+      }
+    }
+    
+    // Ensure body is an object
+    if (!req.body || typeof req.body !== 'object') {
+      req.body = {};
+    }
+  }
+  next();
+});
+
 // CORS middleware for Vercel
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -23,10 +44,10 @@ let routesInitialized = false;
 
 async function initializeRoutes() {
   if (!routesInitialized) {
-    console.log('Initializing routes for Vercel...');
+    console.log('[Vercel] Initializing routes...');
     await registerRoutes(app);
     routesInitialized = true;
-    console.log('Routes initialized successfully');
+    console.log('[Vercel] Routes initialized successfully');
   }
 }
 
@@ -34,37 +55,47 @@ async function initializeRoutes() {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log(`[Vercel] ${req.method} ${req.url}`);
-    console.log('[Vercel] Headers:', JSON.stringify(req.headers));
+    console.log('[Vercel] Headers:', req.headers['content-type']);
     console.log('[Vercel] Body type:', typeof req.body);
-    console.log('[Vercel] Body:', JSON.stringify(req.body));
+    
+    // Log body for POST requests
+    if (req.method === 'POST') {
+      console.log('[Vercel] Body content:', JSON.stringify(req.body).substring(0, 200));
+    }
     
     // Initialize routes if not already done
     await initializeRoutes();
     
-    // Ensure req has body property for Express
-    if (!('body' in req)) {
-      (req as any).body = {};
-    }
-    
-    // Handle the request with Express
-    return new Promise((resolve, reject) => {
-      // Cast to `any` to satisfy TypeScript – runtime behaviour is unchanged
+    // Create a promise to handle the Express app
+    await new Promise<void>((resolve, reject) => {
+      // Set a timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        reject(new Error('Request timeout'));
+      }, 9000); // 9 seconds (Vercel has 10s limit)
+      
+      // Cast to any to handle type mismatch
       (app as any)(req, res, (err: any) => {
+        clearTimeout(timeout);
         if (err) {
-          console.error('Express error:', err);
+          console.error('[Vercel] Express error:', err);
           reject(err);
         } else {
-          resolve(undefined);
+          resolve();
         }
       });
     });
   } catch (error) {
-    console.error('Serverless function error:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
-    res.status(500).json({ 
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: process.env.NODE_ENV === 'development' ? (error as Error).stack : undefined
-    });
+    console.error('[Vercel] Handler error:', error);
+    console.error('[Vercel] Error stack:', error instanceof Error ? error.stack : 'No stack');
+    
+    // Ensure we send a response
+    if (!res.headersSent) {
+      res.status(500).json({ 
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        path: req.url,
+        method: req.method
+      });
+    }
   }
 } 
