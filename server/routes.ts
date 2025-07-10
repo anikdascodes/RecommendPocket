@@ -157,7 +157,12 @@ export async function registerRoutes(app: Express): Promise<Server | Express> {
 }
 
 async function generateAIRecommendations(preferences: any, allContent: any[]) {
-  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "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";
+  const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+  
+  if (!OPENROUTER_API_KEY) {
+    throw new Error("OPENROUTER_API_KEY environment variable is not set");
+  }
+  
   const MODEL_NAME = "google/gemma-3n-e2b-it:free";
 
   // Create a more detailed prompt with specific instructions

@@ -5,8 +5,10 @@
 Create a `.env` file in the root directory with the following content:
 
 ```bash
-OPENROUTER_API_KEY=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
+OPENROUTER_API_KEY=your_new_openrouter_api_key_here
 ```
+
+⚠️ **SECURITY NOTE**: Replace `your_new_openrouter_api_key_here` with your actual API key from https://openrouter.ai/keys
 
 ## Setup Instructions
 

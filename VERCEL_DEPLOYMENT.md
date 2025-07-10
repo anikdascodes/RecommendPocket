@@ -37,9 +37,11 @@
 In the Vercel project settings, add these environment variables:
 
 ```bash
-OPENROUTER_API_KEY=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
+OPENROUTER_API_KEY=your_new_openrouter_api_key_here
 NODE_ENV=production
 ```
+
+⚠️ **IMPORTANT**: Never commit API keys to your repository! Always use environment variables.
 
 **How to add environment variables:**
 1. Go to your project dashboard on Vercel
