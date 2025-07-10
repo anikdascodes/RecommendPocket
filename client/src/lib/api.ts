@@ -24,13 +24,24 @@ export const contentApi = {
   
   // Enhanced recommendation endpoints
   generateRecommendations: async (request: GenerateRecommendationsRequest) => {
+    console.log('Sending recommendation request:', request);
     const response = await fetch('/api/recommendations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request)
     });
-    if (!response.ok) throw new Error('Failed to generate recommendations');
-    return response.json();
+    
+    console.log('Recommendation response status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Recommendation request failed:', response.status, errorText);
+      throw new Error(`Failed to generate recommendations: ${response.status} ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log('Recommendation response data:', data);
+    return data;
   },
   
   submitRecommendationFeedback: async (request: RecommendationFeedbackRequest) => {

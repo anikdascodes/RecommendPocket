@@ -57,16 +57,33 @@ export async function registerRoutes(app: Express): Promise<Server | Express> {
   // Get enhanced smart recommendations using advanced local algorithm
   app.post("/api/recommendations", async (req, res) => {
     try {
+      console.log('Recommendation request received:', JSON.stringify(req.body, null, 2));
       const { preferences } = req.body;
+      
+      if (!preferences) {
+        console.error('No preferences provided in request');
+        return res.status(400).json({ error: "Preferences are required" });
+      }
+      
       const userId = 1; // Demo user ID
+      console.log('Using userId:', userId);
       
       // Get all content and user data
+      console.log('Fetching content and user data...');
       const allContent = await storage.getAllAudioContent();
+      console.log('All content count:', allContent.length);
+      
       const userFavorites = await storage.getUserFavorites(userId);
+      console.log('User favorites count:', userFavorites.length);
+      
       const userHistory = await storage.getListeningHistory(userId);
+      console.log('User history count:', userHistory.length);
+      
       const userRatings = await storage.getUserRatings(userId);
+      console.log('User ratings count:', userRatings.length);
       
       // Generate enhanced smart recommendations using advanced algorithm
+      console.log('Generating recommendations...');
       const recommendations = generateAdvancedRecommendations(
         preferences, 
         allContent, 
@@ -75,10 +92,15 @@ export async function registerRoutes(app: Express): Promise<Server | Express> {
         userRatings
       );
       
+      console.log('Generated recommendations count:', recommendations.length);
       res.json(recommendations);
     } catch (error) {
       console.error("Error generating recommendations:", error);
-      res.status(500).json({ error: "Failed to generate recommendations" });
+      console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ 
+        error: "Failed to generate recommendations",
+        message: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
@@ -171,10 +193,12 @@ export async function registerRoutes(app: Express): Promise<Server | Express> {
 
   // For serverless environments, return the app directly
   if (process.env.VERCEL || process.env.NODE_ENV === 'production') {
+    console.log('Returning Express app for serverless environment');
     return app;
   }
   
   // For development, create and return HTTP server
+  console.log('Creating HTTP server for development environment');
   const httpServer = createServer(app);
   return httpServer;
 }
