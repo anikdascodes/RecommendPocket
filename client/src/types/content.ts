@@ -7,6 +7,13 @@ export interface ContentItem {
   rating: string;
   thumbnail: string;
   playCount?: number;
+  tags?: string[];
+  language?: string;
+  narrator?: string;
+  audioUrl?: string;
+  fileSize?: string;
+  releaseDate?: string;
+  totalDurationMinutes?: number;
 }
 
 export interface UserPreferences {

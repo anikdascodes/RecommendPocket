@@ -72,6 +72,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Favorites endpoints
+  app.get("/api/favorites/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const favorites = await storage.getUserFavorites(userId);
+      res.json(favorites);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch favorites" });
+    }
+  });
+
+  app.post("/api/favorites", async (req, res) => {
+    try {
+      const { userId, contentId } = req.body;
+      const favorite = await storage.addToFavorites(userId, contentId);
+      res.json(favorite);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add to favorites" });
+    }
+  });
+
+  app.delete("/api/favorites", async (req, res) => {
+    try {
+      const { userId, contentId } = req.body;
+      const removed = await storage.removeFromFavorites(userId, contentId);
+      res.json({ success: removed });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove from favorites" });
+    }
+  });
+
+  // Listening history endpoints
+  app.get("/api/history/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const history = await storage.getListeningHistory(userId);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch listening history" });
+    }
+  });
+
+  app.post("/api/progress", async (req, res) => {
+    try {
+      const { userId, contentId, progressMinutes, completed } = req.body;
+      const progress = await storage.updateListeningProgress(userId, contentId, progressMinutes, completed);
+      res.json(progress);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update progress" });
+    }
+  });
+
+  // Rating endpoints
+  app.post("/api/rate", async (req, res) => {
+    try {
+      const { userId, contentId, rating, review } = req.body;
+      const userRating = await storage.rateContent(userId, contentId, rating, review);
+      res.json(userRating);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to rate content" });
+    }
+  });
+
+  app.get("/api/content/:id/rating", async (req, res) => {
+    try {
+      const contentId = parseInt(req.params.id);
+      const averageRating = await storage.getAverageRating(contentId);
+      res.json({ averageRating });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch rating" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

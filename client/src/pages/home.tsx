@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Sparkles, RefreshCw, Flame, Plus } from "lucide-react";
@@ -7,7 +7,9 @@ import Header from "@/components/header";
 import ContentCard from "@/components/content-card";
 import CategoryFilter from "@/components/category-filter";
 import LoadingSkeleton from "@/components/loading-skeleton";
+import AudioPlayer from "@/components/audio-player";
 import { contentApi } from "@/lib/api";
+import { queryClient } from "@/lib/queryClient";
 import { ContentItem, UserPreferences, Recommendation } from "@/types/content";
 
 interface HomeProps {
@@ -19,11 +21,16 @@ export default function Home({ userPreferences }: HomeProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const [currentlyPlaying, setCurrentlyPlaying] = useState<ContentItem | null>(null);
+  const [isPlayerOpen, setIsPlayerOpen] = useState(false);
+  const [favorites, setFavorites] = useState<Set<number>>(new Set());
   
   // Popular search suggestions when no query
   const popularSuggestions = [
     "romance", "thriller", "mystery", "comedy", "fantasy", "adventure", "sci-fi", "drama"
   ];
+
+  const userId = 1; // For demo purposes
 
   // Fetch all content
   const { data: allContent = [], isLoading: contentLoading } = useQuery({
@@ -38,6 +45,18 @@ export default function Home({ userPreferences }: HomeProps) {
     enabled: searchQuery.length > 0,
   });
 
+  // Fetch user favorites
+  const { data: userFavorites = [] } = useQuery({
+    queryKey: ["/api/favorites", userId],
+    queryFn: () => contentApi.getUserFavorites(userId),
+  });
+
+  // Fetch listening history
+  const { data: listeningHistory = [] } = useQuery({
+    queryKey: ["/api/history", userId],
+    queryFn: () => contentApi.getListeningHistory(userId),
+  });
+
   // Generate AI recommendations
   const generateRecommendationsMutation = useMutation({
     mutationFn: contentApi.generateRecommendations,
@@ -46,14 +65,51 @@ export default function Home({ userPreferences }: HomeProps) {
     },
   });
 
+  // Favorites mutations
+  const addToFavoritesMutation = useMutation({
+    mutationFn: ({ userId, contentId }: { userId: number; contentId: number }) => 
+      contentApi.addToFavorites(userId, contentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+    },
+  });
+
+  const removeFromFavoritesMutation = useMutation({
+    mutationFn: ({ userId, contentId }: { userId: number; contentId: number }) => 
+      contentApi.removeFromFavorites(userId, contentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/favorites"] });
+    },
+  });
+
+  // Progress tracking mutation
+  const updateProgressMutation = useMutation({
+    mutationFn: ({ userId, contentId, progressMinutes, completed }: { 
+      userId: number; 
+      contentId: number; 
+      progressMinutes: number; 
+      completed: boolean;
+    }) => contentApi.updateProgress(userId, contentId, progressMinutes, completed),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/history"] });
+    },
+  });
+
+  // Update favorites set when data changes
+  useEffect(() => {
+    if (userFavorites) {
+      setFavorites(new Set(userFavorites.map((fav: any) => fav.contentId)));
+    }
+  }, [userFavorites]);
+
   // Generate initial recommendations
   useEffect(() => {
-    if (userPreferences && !generateRecommendationsMutation.isPending) {
+    if (userPreferences && recommendations.length === 0 && !generateRecommendationsMutation.isPending) {
       generateRecommendationsMutation.mutate({
         preferences: userPreferences,
       });
     }
-  }, [userPreferences]);
+  }, [userPreferences, recommendations.length, generateRecommendationsMutation.isPending]);
 
   // Use search results when searching, otherwise filter all content by category
   const baseContent = searchQuery.length > 0 ? searchResults : allContent;
@@ -68,8 +124,44 @@ export default function Home({ userPreferences }: HomeProps) {
   };
 
   const handlePlay = (content: ContentItem) => {
-    console.log("Playing content:", content.title);
-    // Implement play functionality
+    setCurrentlyPlaying(content);
+    setIsPlayerOpen(true);
+  };
+
+  const handleFavorite = (contentId: number) => {
+    if (favorites.has(contentId)) {
+      removeFromFavoritesMutation.mutate({ userId, contentId });
+      setFavorites(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(contentId);
+        return newSet;
+      });
+    } else {
+      addToFavoritesMutation.mutate({ userId, contentId });
+      setFavorites(prev => new Set([...prev, contentId]));
+    }
+  };
+
+  const handleProgressUpdate = (progressMinutes: number, completed: boolean) => {
+    if (currentlyPlaying) {
+      updateProgressMutation.mutate({
+        userId,
+        contentId: currentlyPlaying.id,
+        progressMinutes,
+        completed,
+      });
+    }
+  };
+
+  // Get progress for content
+  const getContentProgress = (contentId: number) => {
+    const history = listeningHistory.find((h: any) => h.contentId === contentId);
+    if (!history || !currentlyPlaying) return 0;
+    
+    // Calculate progress percentage based on total duration
+    const totalMinutes = currentlyPlaying.totalDurationMinutes || 
+      parseInt(currentlyPlaying.duration.replace(/[^\d]/g, '')) || 60;
+    return Math.min((history.progressMinutes / totalMinutes) * 100, 100);
   };
 
   const trendingContent = allContent
@@ -258,6 +350,9 @@ export default function Home({ userPreferences }: HomeProps) {
                       key={content.id}
                       content={content}
                       onPlay={handlePlay}
+                      onFavorite={handleFavorite}
+                      isFavorite={favorites.has(content.id)}
+                      progress={getContentProgress(content.id)}
                     />
                   ))
                 ) : (
@@ -330,6 +425,16 @@ export default function Home({ userPreferences }: HomeProps) {
           </div>
         </div>
       </section>
+
+      {/* Audio Player */}
+      <AudioPlayer
+        content={currentlyPlaying}
+        isOpen={isPlayerOpen}
+        onClose={() => setIsPlayerOpen(false)}
+        onFavorite={handleFavorite}
+        isFavorite={currentlyPlaying ? favorites.has(currentlyPlaying.id) : false}
+        onProgressUpdate={handleProgressUpdate}
+      />
     </div>
   );
 }
