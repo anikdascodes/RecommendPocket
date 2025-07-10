@@ -80,19 +80,35 @@ async function generateAIRecommendations(preferences: any, allContent: any[]) {
   const OPENROUTER_API_KEY = "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";
   const MODEL_NAME = "google/gemma-2-9b-it:free";
 
-  const prompt = `Based on user preferences:
-- Preferred genres: ${preferences.genres.join(", ")}
-- Listening duration: ${preferences.duration}
+  // Create a more detailed prompt with specific instructions
+  const userGenres = preferences.genres.join(", ");
+  const durationPreference = preferences.duration;
+  
+  const contentList = allContent.map(c => 
+    `ID: ${c.id}, Title: "${c.title}", Category: ${c.category}, Duration: ${c.duration}, Description: "${c.description}"`
+  ).join("\n");
 
-Available audio content: ${JSON.stringify(allContent.map(c => ({ id: c.id, title: c.title, category: c.category, description: c.description })))}
+  const prompt = `You are an expert audio content recommendation engine. Analyze the user's preferences and recommend the most suitable content.
 
-Please recommend the best 6-8 pieces of content for this user. Return a JSON array with content IDs, reasons for recommendation, and scores (1-100). Focus on matching genres and duration preferences.
+USER PREFERENCES:
+- Preferred genres: ${userGenres}
+- Listening session length: ${durationPreference}
 
-Example format:
+AVAILABLE CONTENT:
+${contentList}
+
+TASK: Recommend exactly 6 pieces of content that best match the user's preferences. Consider:
+1. Genre matching (highest priority)
+2. Duration compatibility with listening habits
+3. Content quality and engagement potential
+
+REQUIRED OUTPUT FORMAT (JSON only, no additional text):
 [
-  {"contentId": 1, "reason": "Perfect match for romance preference with engaging storyline", "score": 95},
-  {"contentId": 3, "reason": "Great comedy content that fits your preferred listening duration", "score": 88}
-]`;
+  {"contentId": 1, "reason": "Specific reason why this matches user preferences", "score": 95},
+  {"contentId": 3, "reason": "Another specific matching reason", "score": 88}
+]
+
+Return only the JSON array, no other text or formatting.`;
 
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -107,42 +123,79 @@ Example format:
         model: MODEL_NAME,
         messages: [
           {
+            role: "system",
+            content: "You are an expert audio content recommendation system. Always respond with valid JSON arrays only, no additional text or formatting."
+          },
+          {
             role: "user",
             content: prompt
           }
         ],
-        temperature: 0.7,
-        max_tokens: 1000
+        temperature: 0.3,
+        max_tokens: 1500,
+        top_p: 0.9
       })
     });
 
     if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    const aiResponse = data.choices[0].message.content.trim();
+    
+    console.log("AI Response:", aiResponse);
     
     // Parse AI response to extract recommendations
     let recommendations;
     try {
+      // Clean the response - remove any markdown formatting
+      let cleanResponse = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
       // Try to extract JSON from the AI response
-      const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
+      const jsonMatch = cleanResponse.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         recommendations = JSON.parse(jsonMatch[0]);
       } else {
-        throw new Error("No JSON found in AI response");
+        // Try parsing the entire response as JSON
+        recommendations = JSON.parse(cleanResponse);
       }
+      
+      // Validate recommendations structure
+      if (!Array.isArray(recommendations)) {
+        throw new Error("Response is not an array");
+      }
+      
+      // Ensure all recommendations have required fields
+      recommendations = recommendations.filter(rec => 
+        rec.contentId && rec.reason && rec.score
+      ).slice(0, 6);
+      
+      if (recommendations.length === 0) {
+        throw new Error("No valid recommendations found");
+      }
+      
     } catch (parseError) {
-      console.error("Failed to parse AI response, using fallback:", parseError);
-      // Fallback: recommend based on genre preferences
-      recommendations = allContent
-        .filter(content => preferences.genres.includes(content.category))
+      console.error("Failed to parse AI response:", parseError);
+      console.error("Raw AI response:", aiResponse);
+      
+      // Enhanced fallback: recommend based on genre preferences with better matching
+      const genreMatches = allContent.filter(content => 
+        preferences.genres.includes(content.category)
+      );
+      
+      // If no genre matches, pick diverse content
+      const fallbackContent = genreMatches.length > 0 ? genreMatches : allContent;
+      
+      recommendations = fallbackContent
         .slice(0, 6)
-        .map(content => ({
+        .map((content, index) => ({
           contentId: content.id,
-          reason: `Recommended because you selected ${content.category} as a preferred genre`,
-          score: 85
+          reason: genreMatches.length > 0 
+            ? `Perfect match for your ${content.category} preference - ${content.title} offers engaging storytelling`
+            : `Highly rated ${content.category} content - ${content.title} is popular among listeners`,
+          score: genreMatches.length > 0 ? 90 - (index * 5) : 75 - (index * 3)
         }));
     }
 

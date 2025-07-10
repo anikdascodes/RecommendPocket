@@ -175,7 +175,7 @@ export class MemStorage implements IStorage {
     const userPref: UserPreferences = { 
       id,
       userId: preferences.userId,
-      genres: Array.isArray(preferences.genres) ? preferences.genres : [],
+      genres: preferences.genres as string[],
       duration: preferences.duration,
       completedOnboarding: preferences.completedOnboarding || false
     };
