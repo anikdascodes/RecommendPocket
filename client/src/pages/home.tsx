@@ -18,6 +18,12 @@ export default function Home({ userPreferences }: HomeProps) {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  
+  // Popular search suggestions when no query
+  const popularSuggestions = [
+    "romance", "thriller", "mystery", "comedy", "fantasy", "adventure", "sci-fi", "drama"
+  ];
 
   // Fetch all content
   const { data: allContent = [], isLoading: contentLoading } = useQuery({
@@ -82,10 +88,91 @@ export default function Home({ userPreferences }: HomeProps) {
               type="text"
               placeholder="Search for audio content..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => {
+                // Delay hiding suggestions to allow clicking on them
+                setTimeout(() => setShowSuggestions(false), 150);
+              }}
               className="w-full bg-gray-700 border-gray-600 rounded-xl px-6 py-4 pl-12 text-white placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-transparent"
             />
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            
+            {/* Search Suggestions Dropdown */}
+            {showSuggestions && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-gray-700 border border-gray-600 rounded-xl shadow-lg z-50 max-h-96 overflow-y-auto">
+                {searchQuery.length > 0 ? (
+                  // Show search results when user is typing
+                  searchLoading ? (
+                    <div className="px-4 py-3 text-gray-400 flex items-center">
+                      <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                      Searching...
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <>
+                      <div className="px-4 py-2 text-xs text-gray-400 border-b border-gray-600">
+                        {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} found
+                      </div>
+                      {searchResults.slice(0, 6).map((content: ContentItem) => (
+                        <div
+                          key={content.id}
+                          className="px-4 py-3 hover:bg-gray-600 cursor-pointer border-b border-gray-600 last:border-b-0 transition-colors"
+                          onClick={() => {
+                            setSearchQuery(content.title);
+                            setShowSuggestions(false);
+                          }}
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-white font-medium truncate">{content.title}</div>
+                              <div className="text-gray-400 text-sm truncate">{content.description}</div>
+                              <div className="text-gray-500 text-xs mt-1">
+                                {content.category} • {content.duration} • {content.rating}⭐
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {searchResults.length > 6 && (
+                        <div className="px-4 py-2 text-xs text-gray-400 text-center">
+                          and {searchResults.length - 6} more results...
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="px-4 py-3 text-gray-400">
+                      No results found for "{searchQuery}"
+                    </div>
+                  )
+                ) : (
+                  // Show popular suggestions when search is empty
+                  <>
+                    <div className="px-4 py-2 text-xs text-gray-400 border-b border-gray-600">
+                      Popular searches
+                    </div>
+                    {popularSuggestions.map((suggestion) => (
+                      <div
+                        key={suggestion}
+                        className="px-4 py-3 hover:bg-gray-600 cursor-pointer border-b border-gray-600 last:border-b-0 transition-colors"
+                        onClick={() => {
+                          setSearchQuery(suggestion);
+                          setShowSuggestions(false);
+                        }}
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                          <div className="text-white font-medium">{suggestion}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </section>
